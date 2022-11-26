@@ -502,8 +502,28 @@ function clear_table() {
     }
 }
 
+function show_message() {
+    let table = document.querySelector("table");
+    let tbody = document.querySelector("table tbody");
+
+    let new_tbody = document.createElement("tbody");
+    let row = document.createElement("tr");
+    let msg = document.createElement("td");
+
+    msg.setAttribute("class", "msg");
+    msg.setAttribute("colspan", "6");
+    msg.textContent = "calculating combinations";
+
+    row.appendChild(msg);
+    new_tbody.appendChild(row);
+
+    table.replaceChild(new_tbody, tbody);
+}
+
 function populate_table(results) {
-    let fragment = document.createDocumentFragment();
+    let table = document.querySelector("table");
+    let tbody = document.querySelector("table tbody");
+    let new_tbody = document.createElement("tbody");
     let rank = 1;
 
     for (let result of results) {
@@ -545,7 +565,7 @@ function populate_table(results) {
         r2_cell.appendChild(document.createTextNode(format_resistance(result[7])));
         row.appendChild(r2_cell);
 
-        fragment.appendChild(row);
+        new_tbody.appendChild(row);
 
         rank++;
     }
@@ -561,41 +581,39 @@ function populate_table(results) {
 
         row.appendChild(msg_cell);
 
-        fragment.appendChild(row);
+        new_tbody.appendChild(row);
     }
 
-    let table = document.querySelector("table");
-    let tbody = document.createElement("tbody");
-
-    tbody.appendChild(fragment);
-    table.appendChild(tbody);
+    table.replaceChild(new_tbody, tbody);
 }
 
 window.onload = () => {
     let calculate = () => {
-        clear_table();
+        show_message();
 
-        let capacitors = capacitors_table(
-            read_capacitance_series(),
-            read_minimum_capacitance(),
-            read_maximum_capacitance()
-        );
-        let resistors = resistors_table(
-            read_resistance_series(),
-            read_minimum_resistance(),
-            read_maximum_resistance()
-        );
+        setTimeout(() => {
+            let capacitors = capacitors_table(
+                read_capacitance_series(),
+                read_minimum_capacitance(),
+                read_maximum_capacitance()
+            );
+            let resistors = resistors_table(
+                read_resistance_series(),
+                read_minimum_resistance(),
+                read_maximum_resistance()
+            );
 
-        let target_r1 = read_target_r1();
-        let target_r2 = read_target_r2();
-        let target_c1 = read_target_c1();
-        let target_c2 = read_target_c1();
-        let target_frequency = read_target_frequency();
-        let target_q = read_target_q();
+            let target_r1 = read_target_r1();
+            let target_r2 = read_target_r2();
+            let target_c1 = read_target_c1();
+            let target_c2 = read_target_c1();
+            let target_frequency = read_target_frequency();
+            let target_q = read_target_q();
 
-        let results = lookup(target_frequency, target_q, target_r1, target_r2, target_c1, target_c2, capacitors, resistors);
+            let results = lookup(target_frequency, target_q, target_r1, target_r2, target_c1, target_c2, capacitors, resistors);
 
-        populate_table(results);
+            populate_table(results);
+        }, 1);
     };
 
     document.querySelector("button").onclick = calculate;

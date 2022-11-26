@@ -75,7 +75,7 @@ div.field select {
     border: 1px solid hsl(270deg, 30%, 80%);
     border-radius: 0.25rem;
     grid-column: 2;
-    padding: 0.25rem;
+    padding: 0.25rem 0.5rem;
 }
 div.field input + select,
 div.field input + input {
@@ -93,11 +93,13 @@ div.field p {
 }
 
 button {
-    background: hsl(270deg, 30%, 90%);
-    border: 1px solid hsl(270deg, 30%, 80%);
+    background: hsl(270deg, 30%, 30%);
+    border: 1px solid hsl(270deg, 30%, 20%);
     border-radius: 0.25rem;
+    color: hsl(270deg, 30%, 90%);
+    cursor: pointer;
     justify-self: center;
-    padding: 0.25rem;
+    padding: 0.25rem 0.5rem;
     margin-top: 1rem;
 }
 
