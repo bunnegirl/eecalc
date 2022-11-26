@@ -218,14 +218,30 @@ function lookup(target_f_spec, target_q_spec, r1, target_r2, target_c1, target_c
                         let q = 2 * Math.PI * f * l / r1;
 
                         if (l > min_l && l < max_l && q > min_q && q < max_q && f > min_f && f < max_f) {
-                            let rating = ((target_l / l) + (target_f / f) + (target_q / q)) - 3;
+                            let l_dist = target_l - l;
+                            let f_dist = target_f - f;
+                            let q_dist = target_q - q;
 
-                            if (rating < 0) {
-                                rating = 0 - rating;
+                            if (l_dist < 0) {
+                                l_dist = 0 - l_dist;
+                            }
+
+                            if (f_dist < 0) {
+                                f_dist = 0 - f_dist;
+                            }
+
+                            if (q_dist < 0) {
+                                q_dist = 0 - q_dist;
+                            }
+
+                            let diff = ((target_l / l) + (target_f / f) + (target_q / q)) / 3;
+
+                            if (diff < 0) {
+                                diff = 0 - diff
                             }
 
                             results.push([
-                                rating,
+                                (f_dist + q_dist + l_dist) / 2,
                                 l, f, q, c1, c2, r1, r2
                             ]);
                         }
