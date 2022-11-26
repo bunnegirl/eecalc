@@ -172,7 +172,7 @@ function lookup(target_f_spec, target_q_spec, r1, target_r2, target_c1, target_c
 
     let checked = [];
     let results = [];
-    let target_l = 0.001;
+    let target_l = 0.01;
     let target_f = target_f_spec[0];
     let min_f = target_f * (1 - target_f_spec[1]);
     let max_f = target_f * (1 + target_f_spec[1]);
@@ -252,7 +252,7 @@ function lookup(target_f_spec, target_q_spec, r1, target_r2, target_c1, target_c
             }
         }
 
-        target_l += 0.001;
+        target_l += 0.01;
     }
 
     results.sort((a, b) => {
@@ -348,12 +348,12 @@ function format_frequency(frequency) {
 }
 
 function format_q(q) {
-    return q.toFixed(2);
+    return q.toFixed(2).replace(/\.0+$/, "");
 }
 
 function format_capacitance(capacitance) {
     let mult = 1;
-    let unit = "";
+    let unit = ".";
 
     if (capacitance >= 1) {
         // 
@@ -379,7 +379,40 @@ function format_capacitance(capacitance) {
         unit = "p";
     }
 
-    let value = (capacitance / mult).toFixed(1).replace(/(\.0+$|\.)/, unit);
+    let value = (capacitance / mult).toFixed(1).replace(/\.0+$/, "") + unit;
+
+    return value;
+}
+
+function format_inductance(inductance) {
+    let mult = 1;
+    let unit = ".";
+
+    if (inductance >= 1) {
+        // 
+    }
+
+    else if (inductance >= MILLI) {
+        mult = MILLI;
+        unit = "m";
+    }
+
+    else if (inductance >= MICRO) {
+        mult = MICRO;
+        unit = "u";
+    }
+
+    else if (inductance >= NANO) {
+        mult = NANO;
+        unit = "n";
+    }
+
+    else if (inductance >= PICO) {
+        mult = PICO;
+        unit = "p";
+    }
+
+    let value = (inductance / mult).toFixed(1).replace(/\.0+$/, "") + unit;
 
     return value;
 }
@@ -398,7 +431,7 @@ function format_resistance(resistance) {
         unit = "k";
     }
 
-    let value = (resistance / mult).toFixed(1).replace(/(\.0+$|\.)/, unit);
+    let value = (resistance / mult).toFixed(1).replace(/\.0+$/, "") + unit;
 
     return value;
 }
@@ -494,14 +527,6 @@ function read_target_q() {
     return [parseFloat(value), parseFloat(select.value)];
 }
 
-function clear_table() {
-    let tbody = document.querySelector("table tbody");
-
-    if (tbody) {
-        tbody.parentNode.removeChild(tbody);
-    }
-}
-
 function show_message() {
     let table = document.querySelector("table");
     let tbody = document.querySelector("table tbody");
@@ -511,7 +536,7 @@ function show_message() {
     let msg = document.createElement("td");
 
     msg.setAttribute("class", "msg");
-    msg.setAttribute("colspan", "6");
+    msg.setAttribute("colspan", "7");
     msg.textContent = "calculating combinations";
 
     row.appendChild(msg);
@@ -540,6 +565,12 @@ function populate_table(results) {
         q_cell.className = "q";
         q_cell.appendChild(document.createTextNode(format_q(result[3])));
         row.appendChild(q_cell);
+
+        let l_cell = document.createElement("td");
+
+        l_cell.className = "l";
+        l_cell.appendChild(document.createTextNode(format_inductance(result[1])));
+        row.appendChild(l_cell);
 
         let c1_cell = document.createElement("td");
 
@@ -576,7 +607,7 @@ function populate_table(results) {
         let msg_cell = document.createElement("td");
 
         msg_cell.setAttribute("class", "msg");
-        msg_cell.setAttribute("colspan", "6");
+        msg_cell.setAttribute("colspan", "7");
         msg_cell.textContent = "no possible combinations were found";
 
         row.appendChild(msg_cell);
