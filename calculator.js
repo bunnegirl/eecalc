@@ -353,7 +353,7 @@ function format_q(q) {
 
 function format_capacitance(capacitance) {
     let mult = 1;
-    let unit = ".";
+    let unit = "";
 
     if (capacitance >= 1) {
         // 
@@ -386,7 +386,7 @@ function format_capacitance(capacitance) {
 
 function format_inductance(inductance) {
     let mult = 1;
-    let unit = ".";
+    let unit = "";
 
     if (inductance >= 1) {
         // 
