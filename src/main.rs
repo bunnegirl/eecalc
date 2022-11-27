@@ -471,18 +471,14 @@ fn App() -> Html {
                 unreachable!()
             };
 
-            log!(format!("{:#?}", frequency_value));
-
-            let x = calculate(
+            results.set(Some(calculate(
                 frequency_value,
                 q_factor_value,
                 r1_value,
                 r2_value,
                 c1_value,
                 c2_value,
-            );
-
-            results.set(Some(x));
+            )));
         }
     };
 
