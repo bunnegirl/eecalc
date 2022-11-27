@@ -538,7 +538,7 @@ fn App() -> Html {
                                         <td class="r1-resistance">{format_units(result.r1_resistance())}</td>
                                         <td class="r2-resistance">{format_units(result.r2_resistance())}</td>
                                         <td class="c1-capacitance">{format_units(result.c1_capacitance())}</td>
-                                        <td class="c2-capacitance">{format_units(result.c1_capacitance())}</td>
+                                        <td class="c2-capacitance">{format_units(result.c2_capacitance())}</td>
                                     </tr>}
                                 }).collect::<Html>()
                             }
