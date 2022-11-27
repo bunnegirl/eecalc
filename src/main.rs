@@ -514,10 +514,10 @@ fn App() -> Html {
                         <th class="frequency">{"frequency"}</th>
                         <th class="q-factor">{"q factor"}</th>
                         <th class="inductance">{"inductance"}</th>
-                        <th class="r1-resistance">{"c1"}</th>
-                        <th class="r2-resistance">{"c2"}</th>
-                        <th class="c1-capacitance">{"r1"}</th>
-                        <th class="c2-capacitance">{"r2"}</th>
+                        <th class="r1-resistance">{"r1"}</th>
+                        <th class="r2-resistance">{"r2"}</th>
+                        <th class="c1-capacitance">{"c1"}</th>
+                        <th class="c2-capacitance">{"c2"}</th>
                     </tr>
                 </thead>
                 <tbody>

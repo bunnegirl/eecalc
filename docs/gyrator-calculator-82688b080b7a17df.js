@@ -626,7 +626,7 @@ function initSync(module) {
 
 async function init(input) {
     if (typeof input === 'undefined') {
-        input = new URL('gyrator-calculator-a2d60eccddf8482b_bg.wasm', import.meta.url);
+        input = new URL('gyrator-calculator-82688b080b7a17df_bg.wasm', import.meta.url);
     }
     const imports = getImports();
 
