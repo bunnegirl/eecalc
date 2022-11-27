@@ -148,23 +148,6 @@ function resistors_table(table, min, max) {
     return res;
 }
 
-function resistors_table(table, min, max) {
-    let res = [];
-    let mults = [0.1, 1, 10, 100, 1000, 10000, 100000, 1000000];
-
-    for (let mult of mults) {
-        for (let val of table) {
-            val *= mult;
-
-            if (val > min && val < max) {
-                res.push(val);
-            }
-        }
-    }
-
-    return res;
-}
-
 function lookup(target_f_spec, target_q_spec, r1, target_r2, target_c1, target_c2, capacitors, resistors) {
     // f = 1 / (2 * pi * sqrt(l * c1))
     // q = 2 * pi * f * l / r1
