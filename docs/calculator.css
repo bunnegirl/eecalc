@@ -110,25 +110,30 @@ table {
 }
 table th {
     color: hsl(270deg, 30%, 40%);
+    cursor: pointer;
+    white-space: nowrap;
+}
+table th .sort {
+    margin-left: 0.25rem;
 }
 table .frequency {
     text-align: left;
-    width: 20%;
+    width: 25%;
 }
 table .q-factor {
     text-align: left;
-    width: 13.33%;
+    width: 15%;
 }
 table .inductance {
     text-align: left;
-    width: 13.33%;
+    width: 20%;
 }
 table .r1-resistance,
 table .r2-resistance,
 table .c1-capacitance,
 table .c2-capacitance {
     text-align: left;
-    width: 13.33%;
+    width: 10%;
 }
 table .msg {
     padding-top: 1rem;

@@ -1,95 +1,19 @@
-use std::result;
-
-use gloo_console::log;
-use gyrator_calculator::tables::*;
+use gyrator_calculator::series::*;
 use gyrator_calculator::units::*;
 use gyrator_calculator::*;
 use wasm_bindgen::JsCast;
 use web_sys::{EventTarget, HtmlInputElement};
 use yew::prelude::*;
 
-// fn main() {
-//     let mut selections = calculate(
-//         ToleranceValue(parse_units("100"), 0.1),
-//         ToleranceValue(parse_units("4"), 0.2),
-//         ComponentValue::Given(parse_units("470")),
-//         ComponentValue::Series(E24, parse_units("1k"), parse_units("100k")),
-//         ComponentValue::Series(E6, parse_units("1n"), parse_units("100u")),
-//         ComponentValue::Series(E6, parse_units("1n"), parse_units("100u")),
-//     );
-
-//     selections.sort_by(|a, b| {
-//         if a.frequency() == b.frequency() {
-//             if a.q_factor() == b.q_factor() {
-//                 if a.inductance() == b.inductance() {
-//                     if a.r1_resistance() == b.r1_resistance() {
-//                         if a.r2_resistance() == b.r2_resistance() {
-//                             if a.c1_capacitance() == b.c1_capacitance() {
-//                                 a.c2_capacitance().partial_cmp(&b.c2_capacitance()).unwrap()
-//                             } else {
-//                                 a.c1_capacitance().partial_cmp(&b.c1_capacitance()).unwrap()
-//                             }
-//                         } else {
-//                             a.r2_resistance().partial_cmp(&b.r2_resistance()).unwrap()
-//                         }
-//                     } else {
-//                         a.r1_resistance().partial_cmp(&b.r1_resistance()).unwrap()
-//                     }
-//                 } else {
-//                     a.inductance().partial_cmp(&b.inductance()).unwrap()
-//                 }
-//             } else {
-//                 a.q_factor().partial_cmp(&b.q_factor()).unwrap()
-//             }
-//         } else {
-//             a.frequency().partial_cmp(&b.frequency()).unwrap()
-//         }
-//     });
-
-//     println!(
-//         "{:<10} {:<10} {:<12} {:<8} {:<8} {:<8} {:<8}",
-//         "frequency", "q factor", "inductance", "r1", "r2", "c1", "c2"
-//     );
-
-//     for selection in &selections {
-//         println!(
-//             "{:<10} {:<10} {:<12} {:<8} {:<8} {:<8} {:<8}",
-//             format_units(selection.frequency()),
-//             format_units(selection.q_factor()),
-//             format_units(selection.inductance()),
-//             format_units(selection.r1_resistance()),
-//             format_units(selection.r2_resistance()),
-//             format_units(selection.c1_capacitance()),
-//             format_units(selection.c2_capacitance())
-//         );
-//     }
-
-//     println!("found {} combinations", selections.len());
-// }
-
-const TOLERANCE_OPTIONS: [f64; 8] = [0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3];
-
-const SERIES_OPTIONS: [Series; 4] = [Series::E6, Series::E12, Series::E24, Series::E48];
-
-use InputType::*;
-
-#[allow(clippy::enum_variant_names)]
-#[derive(Debug, PartialEq)]
-enum InputType {
-    NumberInput(Option<f64>, Option<f64>),
-    SeriesInput(Series, Option<f64>, Option<f64>, f64, f64),
-    ToleranceInput(Option<f64>, f64, f64),
-}
-
 #[derive(Properties, PartialEq)]
 struct InputProps {
     id: &'static str,
     name: &'static str,
     note: Option<&'static str>,
-    value: UseStateHandle<InputType>,
+    value: UseStateHandle<Input>,
 }
 
-#[function_component(Input)]
+#[function_component(InputField)]
 fn input(
     InputProps {
         id,
@@ -98,6 +22,8 @@ fn input(
         value,
     }: &InputProps,
 ) -> Html {
+    let value = value.clone();
+
     let on_series_change = {
         let state = value.clone();
 
@@ -106,10 +32,10 @@ fn input(
                 .target()
                 .expect("Event should have a target when dispatched");
 
-            if let SeriesInput(_, min, max, min_fallback, max_fallback) = &*state {
+            if let InputWithSeries(_, min, max, min_fallback, max_fallback) = &*state {
                 let series = Series::from(element.unchecked_into::<HtmlInputElement>().value());
 
-                state.set(SeriesInput(
+                state.set(InputWithSeries(
                     series,
                     *min,
                     *max,
@@ -128,7 +54,7 @@ fn input(
                 .target()
                 .expect("Event should have a target when dispatched");
 
-            if let SeriesInput(series, _, max, min_fallback, max_fallback) = &*state {
+            if let InputWithSeries(series, _, max, min_fallback, max_fallback) = &*state {
                 let value = &element.unchecked_into::<HtmlInputElement>().value();
 
                 let min = if value.trim().is_empty() {
@@ -137,7 +63,7 @@ fn input(
                     Some(parse_units(value))
                 };
 
-                state.set(SeriesInput(
+                state.set(InputWithSeries(
                     series.clone(),
                     min,
                     *max,
@@ -156,7 +82,7 @@ fn input(
                 .target()
                 .expect("Event should have a target when dispatched");
 
-            if let SeriesInput(series, min, _, min_fallback, max_fallback) = &*state {
+            if let InputWithSeries(series, min, _, min_fallback, max_fallback) = &*state {
                 let value = &element.unchecked_into::<HtmlInputElement>().value();
 
                 let max = if value.trim().is_empty() {
@@ -165,7 +91,7 @@ fn input(
                     Some(parse_units(value))
                 };
 
-                state.set(SeriesInput(
+                state.set(InputWithSeries(
                     series.clone(),
                     *min,
                     max,
@@ -185,17 +111,17 @@ fn input(
                 .expect("Event should have a target when dispatched");
             let value = &element.unchecked_into::<HtmlInputElement>().value();
 
-            if let NumberInput(_, fallback) = &*state {
+            if let InputWithExact(_, fallback) = &*state {
                 if value.trim().is_empty() {
-                    state.set(NumberInput(None, *fallback));
+                    state.set(InputWithExact(None, *fallback));
                 } else {
-                    state.set(NumberInput(Some(parse_units(value)), *fallback));
+                    state.set(InputWithExact(Some(parse_units(value)), *fallback));
                 }
-            } else if let ToleranceInput(_, tolerance, fallback) = &*state {
+            } else if let InputWithTolerance(_, tolerance, fallback) = &*state {
                 if value.trim().is_empty() {
-                    state.set(ToleranceInput(None, *tolerance, *fallback));
+                    state.set(InputWithTolerance(None, *tolerance, *fallback));
                 } else {
-                    state.set(ToleranceInput(
+                    state.set(InputWithTolerance(
                         Some(parse_units(value)),
                         *tolerance,
                         *fallback,
@@ -213,20 +139,38 @@ fn input(
                 .target()
                 .expect("Event should have a target when dispatched");
 
-            if let ToleranceInput(target, _, fallback) = &*state {
+            if let InputWithTolerance(target, _, fallback) = &*state {
                 let value = &element.unchecked_into::<HtmlInputElement>().value();
 
-                state.set(ToleranceInput(*target, parse_units(value), *fallback));
+                state.set(InputWithTolerance(*target, parse_units(value), *fallback));
             }
         }
     };
 
-    if let SeriesInput(series, min, max, min_fallback, max_fallback) = &*(value.clone()) {
-        html! {
+    let format_id = |id: &str, suffix: &str| format!("{}-{}", id, suffix);
+
+    let format_value = |value: &Option<f64>| {
+        if let Some(value) = value {
+            format_units(*value)
+        } else {
+            "".into()
+        }
+    };
+
+    let format_fallback = |fallback: &Option<f64>| {
+        if let Some(value) = fallback {
+            format_units(*value)
+        } else {
+            "optional".into()
+        }
+    };
+
+    match &*value {
+        InputWithSeries(series, min, max, min_fallback, max_fallback) => html! {
             <>
                 <div class="field">
-                    <label for={format!("{}-series", id)}>{format!("{} series", name)}</label>
-                    <select id={format!("{}-series", id)} onchange={on_series_change}>
+                    <label for={format_id(id, "series")}>{format!("{} series", name)}</label>
+                    <select id={format_id(id, "series")} onchange={on_series_change}>
                         {
                             SERIES_OPTIONS.iter().map(|item_series| html! {
                                 <option selected={series == item_series}>{item_series.as_str()}</option>
@@ -235,53 +179,28 @@ fn input(
                     </select>
                 </div>
                 <div class="field">
-                    <label for={format!("{}-range", id)}>{format!("{} range", name)}</label>
+                    <label for={format_id(id, "range")}>{format!("{} range", name)}</label>
                     <input
-                        id={format!("{}-range", id)}
+                        id={format_id(id, "range")}
                         placeholder={format_units(*min_fallback)}
-                        value={
-                            if let Some(min) = min {
-                                format_units(*min)
-                            } else {
-                                "".into()
-                            }
-                        }
+                        value={format_value(min)}
                         onchange={on_min_change}
                     />
                     <input
                         placeholder={format_units(*max_fallback)}
-                        value={
-                            if let Some(max) = max {
-                                format_units(*max)
-                            } else {
-                                "".into()
-                            }
-                        }
+                        value={format_value(max)}
                         onchange={on_max_change}
                     />
                 </div>
             </>
-        }
-    } else if let NumberInput(value, fallback) = &*(value.clone()) {
-        html! {
+        },
+        InputWithExact(target, fallback) => html! {
             <div class="field">
-                <label for={format!("{}-target", id)}>{{format!("{} target", name)}}</label>
+                <label for={format_id(id, "target")}>{{format!("{} target", name)}}</label>
                 <input
-                    id={format!("{}-target", id)}
-                    placeholder={
-                        if let Some(value) = fallback {
-                            format_units(*value)
-                        } else {
-                            "optional".into()
-                        }
-                    }
-                    value={
-                        if let Some(value) = value {
-                            format_units(*value)
-                        } else {
-                            "".into()
-                        }
-                    }
+                    id={format_id(id, "target")}
+                    placeholder={format_fallback(fallback)}
+                    value={format_value(target)}
                     onchange={on_target_change}
                 />
                 {
@@ -292,21 +211,14 @@ fn input(
                     }
                 }
             </div>
-        }
-    } else if let ToleranceInput(value, tolerance, fallback) = &*(value.clone()) {
-        html! {
+        },
+        InputWithTolerance(target, tolerance, fallback) => html! {
             <div class="field">
-                <label for={format!("{}-target", id)}>{format!("{} target", name)}</label>
+                <label for={format_id(id, "target")}>{format!("{} target", name)}</label>
                 <input
-                    id={format!("{}-target", id)}
+                    id={format_id(id, "target")}
                     placeholder={format_units(*fallback)}
-                    value={
-                        if let Some(value) = value {
-                            format_units(*value)
-                        } else {
-                            "".into()
-                        }
-                    }
+                    value={format_value(target)}
                     onchange={on_target_change}
                 />
                 <select id={format!("{}-tolerance", id)} onchange={on_tolerance_change}>
@@ -321,9 +233,212 @@ fn input(
                     }
                 </select>
             </div>
+        },
+    }
+}
+
+#[derive(Clone, PartialEq)]
+enum SortBy {
+    Frequency,
+    QFactor,
+    Inductance,
+    R1Resistance,
+    R2Resistance,
+    C1Capacitance,
+    C2Capacitance,
+}
+
+#[derive(PartialEq)]
+enum SortOrder {
+    Ascending,
+    Descending,
+}
+
+#[derive(Properties, PartialEq)]
+struct ResultsColumnProp {
+    class: &'static str,
+    name: &'static str,
+    column: SortBy,
+    sort_by: UseStateHandle<SortBy>,
+    sort_order: UseStateHandle<SortOrder>,
+    on_sort: Callback<SortBy>,
+}
+
+#[function_component(ResultsColumn)]
+fn results_column(
+    ResultsColumnProp {
+        class,
+        name,
+        column,
+        sort_by,
+        sort_order,
+        on_sort,
+    }: &ResultsColumnProp,
+) -> Html {
+    let sort_by = sort_by.clone();
+    let sort_order = sort_order.clone();
+
+    let onclick = |column: SortBy| on_sort.reform(move |_| column.clone());
+
+    html! {
+        <th
+            class={*class}
+            onclick={onclick(column.clone())}>
+            {name}
+            {
+                if *sort_by == *column {
+                    match *sort_order {
+                        SortOrder::Ascending => html!{<span class="sort">{"⏷"}</span>},
+                        SortOrder::Descending => html!{<span class="sort">{"⏶"}</span>},
+                    }
+                } else {
+                    html!{}
+                }
+            }
+        </th>
+    }
+}
+
+#[derive(Properties, PartialEq)]
+struct ResultsProps {
+    results: UseStateHandle<Option<Vec<Selection>>>,
+}
+
+#[function_component(Results)]
+fn results(ResultsProps { results }: &ResultsProps) -> Html {
+    let results = results.clone();
+    let sort_by = use_state(|| SortBy::Frequency);
+    let sort_order = use_state(|| SortOrder::Ascending);
+
+    let set_sort = {
+        let sort_by = sort_by.clone();
+        let sort_order = sort_order.clone();
+
+        Callback::from(move |column: SortBy| {
+            if *sort_by == column {
+                sort_order.set(if *sort_order == SortOrder::Ascending {
+                    SortOrder::Descending
+                } else {
+                    SortOrder::Ascending
+                })
+            } else {
+                sort_by.set(column)
+            }
+        })
+    };
+
+    let sort = |a: &Selection, b: &Selection| {
+        use SortBy::*;
+        use SortOrder::*;
+
+        let (a, b) = match *sort_by {
+            Frequency => (a.frequency(), b.frequency()),
+            QFactor => (a.q_factor(), b.q_factor()),
+            Inductance => (a.inductance(), b.inductance()),
+            R1Resistance => (a.r1_resistance(), b.r1_resistance()),
+            R2Resistance => (a.r2_resistance(), b.r2_resistance()),
+            C1Capacitance => (a.c1_capacitance(), b.c1_capacitance()),
+            C2Capacitance => (a.c2_capacitance(), b.c2_capacitance()),
+        };
+
+        match *sort_order {
+            Ascending => a.partial_cmp(&b).unwrap(),
+            Descending => b.partial_cmp(&a).unwrap(),
+        }
+    };
+
+    let results = if let Some(mut results) = (*results).clone() {
+        results.sort_by(sort);
+
+        Some(results)
+    } else {
+        None
+    };
+
+    if let Some(results) = results {
+        if results.is_empty() {
+            html! {<p>{"no results found"}</p>}
+        } else {
+            html! {
+                <>
+                <h2>{format!("{} results", results.len())}</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <ResultsColumn
+                                class="frequency"
+                                name="frequency"
+                                column={SortBy::Frequency}
+                                sort_by={sort_by.clone()}
+                                sort_order={sort_order.clone()}
+                                on_sort={set_sort.clone()} />
+                            <ResultsColumn
+                                class="q-factor"
+                                name="q factor"
+                                column={SortBy::QFactor}
+                                sort_by={sort_by.clone()}
+                                sort_order={sort_order.clone()}
+                                on_sort={set_sort.clone()} />
+                            <ResultsColumn
+                                class="inductance"
+                                name="inductance"
+                                column={SortBy::Inductance}
+                                sort_by={sort_by.clone()}
+                                sort_order={sort_order.clone()}
+                                on_sort={set_sort.clone()} />
+                            <ResultsColumn
+                                class="r1-resistance"
+                                name="r1"
+                                column={SortBy::R1Resistance}
+                                sort_by={sort_by.clone()}
+                                sort_order={sort_order.clone()}
+                                on_sort={set_sort.clone()} />
+                            <ResultsColumn
+                                class="r2-resistance"
+                                name="r2"
+                                column={SortBy::R2Resistance}
+                                sort_by={sort_by.clone()}
+                                sort_order={sort_order.clone()}
+                                on_sort={set_sort.clone()} />
+                            <ResultsColumn
+                                class="c1-capacitance"
+                                name="c1"
+                                column={SortBy::C1Capacitance}
+                                sort_by={sort_by.clone()}
+                                sort_order={sort_order.clone()}
+                                on_sort={set_sort.clone()} />
+                            <ResultsColumn
+                                class="c2-capacitance"
+                                name="c2"
+                                column={SortBy::C2Capacitance}
+                                sort_by={sort_by.clone()}
+                                sort_order={sort_order.clone()}
+                                on_sort={set_sort.clone()} />
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {
+                            results.iter().map(|result| {
+                                html!{<tr>
+                                    <td class="frequency">{format_units(result.frequency())}</td>
+                                    <td class="q-factor">{format_units(result.q_factor())}</td>
+                                    <td class="inductance">{format_units(result.inductance())}</td>
+                                    <td class="r1-resistance">{format_units(result.r1_resistance())}</td>
+                                    <td class="r2-resistance">{format_units(result.r2_resistance())}</td>
+                                    <td class="c1-capacitance">{format_units(result.c1_capacitance())}</td>
+                                    <td class="c2-capacitance">{format_units(result.c2_capacitance())}</td>
+                                </tr>}
+                            }).collect::<Html>()
+                        }
+                    </tbody>
+                </table>
+                </>
+            }
         }
     } else {
-        html! {}
+        html! {
+            <p>{"click \"calculate\" above to begin"}</p>
+        }
     }
 }
 
@@ -331,7 +446,7 @@ fn input(
 fn App() -> Html {
     let results = use_state(|| None);
     let capacitance_value = use_state(|| {
-        SeriesInput(
+        InputWithSeries(
             Series::E6,
             None,
             None,
@@ -340,7 +455,7 @@ fn App() -> Html {
         )
     });
     let resistance_value = use_state(|| {
-        SeriesInput(
+        InputWithSeries(
             Series::E24,
             None,
             None,
@@ -348,12 +463,12 @@ fn App() -> Html {
             parse_units("100k"),
         )
     });
-    let frequency_value = use_state(|| ToleranceInput(None, 0.1, 100.0));
-    let q_factor_value = use_state(|| ToleranceInput(None, 0.2, 4.0));
-    let r1_value = use_state(|| NumberInput(None, Some(470.0)));
-    let r2_value = use_state(|| NumberInput(None, None));
-    let c1_value = use_state(|| NumberInput(None, None));
-    let c2_value = use_state(|| NumberInput(None, None));
+    let frequency_value = use_state(|| InputWithTolerance(None, 0.1, 100.0));
+    let q_factor_value = use_state(|| InputWithTolerance(None, 0.2, 4.0));
+    let r1_value = use_state(|| InputWithExact(None, Some(470.0)));
+    let r2_value = use_state(|| InputWithExact(None, None));
+    let c1_value = use_state(|| InputWithExact(None, None));
+    let c2_value = use_state(|| InputWithExact(None, None));
 
     let onclick = {
         let results = results.clone();
@@ -367,117 +482,16 @@ fn App() -> Html {
         let c2_value = c2_value.clone();
 
         move |_| {
-            let capacitance_value =
-                if let SeriesInput(series, min, max, min_fallback, max_fallback) =
-                    &*capacitance_value
-                {
-                    let (min, max) = if let (Some(min), Some(max)) = (min, max) {
-                        (min, max)
-                    } else if let (None, Some(max)) = (min, max) {
-                        (min_fallback, max)
-                    } else if let (Some(min), None) = (min, max) {
-                        (min, max_fallback)
-                    } else {
-                        (min_fallback, max_fallback)
-                    };
-
-                    ComponentValue::Series(series.clone(), *min, *max)
-                } else {
-                    unreachable!()
-                };
-
-            let resistance_value =
-                if let SeriesInput(series, min, max, min_fallback, max_fallback) =
-                    &*resistance_value
-                {
-                    let (min, max) = if let (Some(min), Some(max)) = (min, max) {
-                        (min, max)
-                    } else if let (None, Some(max)) = (min, max) {
-                        (min_fallback, max)
-                    } else if let (Some(min), None) = (min, max) {
-                        (min, max_fallback)
-                    } else {
-                        (min_fallback, max_fallback)
-                    };
-
-                    ComponentValue::Series(series.clone(), *min, *max)
-                } else {
-                    unreachable!()
-                };
-
-            let frequency_value =
-                if let ToleranceInput(target, tolerance, fallback) = &*frequency_value {
-                    let target = if let Some(target) = target {
-                        target
-                    } else {
-                        fallback
-                    };
-
-                    ToleranceValue(*target, *tolerance)
-                } else {
-                    unreachable!()
-                };
-
-            let q_factor_value =
-                if let ToleranceInput(target, tolerance, fallback) = &*q_factor_value {
-                    let target = if let Some(target) = target {
-                        target
-                    } else {
-                        fallback
-                    };
-
-                    ToleranceValue(*target, *tolerance)
-                } else {
-                    unreachable!()
-                };
-
-            let r1_value = if let NumberInput(target, fallback) = &*r1_value {
-                match (target, fallback) {
-                    (Some(target), _) => ComponentValue::Given(*target),
-                    (None, Some(fallback)) => ComponentValue::Given(*fallback),
-                    (None, None) => resistance_value.clone(),
-                }
-            } else {
-                unreachable!()
-            };
-
-            let r2_value = if let NumberInput(target, fallback) = &*r2_value {
-                match (target, fallback) {
-                    (Some(target), _) => ComponentValue::Given(*target),
-                    (None, Some(fallback)) => ComponentValue::Given(*fallback),
-                    (None, None) => resistance_value,
-                }
-            } else {
-                unreachable!()
-            };
-
-            let c1_value = if let NumberInput(target, fallback) = &*c1_value {
-                match (target, fallback) {
-                    (Some(target), _) => ComponentValue::Given(*target),
-                    (None, Some(fallback)) => ComponentValue::Given(*fallback),
-                    (None, None) => capacitance_value.clone(),
-                }
-            } else {
-                unreachable!()
-            };
-
-            let c2_value = if let NumberInput(target, fallback) = &*c2_value {
-                match (target, fallback) {
-                    (Some(target), _) => ComponentValue::Given(*target),
-                    (None, Some(fallback)) => ComponentValue::Given(*fallback),
-                    (None, None) => capacitance_value,
-                }
-            } else {
-                unreachable!()
-            };
+            let capacitance_value = capacitance_value.to_arg().unwrap();
+            let resistance_value = resistance_value.to_arg().unwrap();
 
             results.set(Some(calculate(
-                frequency_value,
-                q_factor_value,
-                r1_value,
-                r2_value,
-                c1_value,
-                c2_value,
+                frequency_value.to_arg().unwrap(),
+                q_factor_value.to_arg().unwrap(),
+                r1_value.to_arg().unwrap_or(resistance_value.clone()),
+                r2_value.to_arg().unwrap_or(resistance_value),
+                c1_value.to_arg().unwrap_or(capacitance_value.clone()),
+                c2_value.to_arg().unwrap_or(capacitance_value),
             )));
         }
     };
@@ -489,69 +503,24 @@ fn App() -> Html {
 
             <h2>{"component ranges"}</h2>
             <div class="fieldset">
-                <Input id="capacitance" name="capacitance" value={capacitance_value.clone()} />
-                <Input id="resistance" name="resistance" value={resistance_value.clone()} />
+                <InputField id="capacitance" name="capacitance" value={capacitance_value} />
+                <InputField id="resistance" name="resistance" value={resistance_value} />
             </div>
 
             <h2>{"gyrator values"}</h2>
             <p>{"avoid setting too many optional fields as it will limit the results significantly"}</p>
             <div class="fieldset">
-                <Input id="frequency" name="frequency" value={frequency_value} />
-                <Input id="q-factor" name="q factor" value={q_factor_value} />
-                <Input id="r1" name="r1" note="the value of r1 sets the gain of the gyrator" value={r1_value.clone()} />
-                <Input id="r2" name="r2" note="use a specific r2 value" value={r2_value.clone()} />
-                <Input id="c1" name="c1" note="use a specific c1 value" value={c1_value.clone()} />
-                <Input id="c2" name="c2" note="use a specific c2 value" value={c2_value.clone()} />
+                <InputField id="frequency" name="frequency" value={frequency_value} />
+                <InputField id="q-factor" name="q factor" value={q_factor_value} />
+                <InputField id="r1" name="r1" note="the value of r1 sets the gain of the gyrator" value={r1_value} />
+                <InputField id="r2" name="r2" note="use a specific r2 value" value={r2_value} />
+                <InputField id="c1" name="c1" note="use a specific c1 value" value={c1_value} />
+                <InputField id="c2" name="c2" note="use a specific c2 value" value={c2_value} />
             </div>
 
             <button type="button" {onclick}>{"calculate"}</button>
 
-            <h2>{"results"}</h2>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th class="frequency">{"frequency"}</th>
-                        <th class="q-factor">{"q factor"}</th>
-                        <th class="inductance">{"inductance"}</th>
-                        <th class="r1-resistance">{"r1"}</th>
-                        <th class="r2-resistance">{"r2"}</th>
-                        <th class="c1-capacitance">{"c1"}</th>
-                        <th class="c2-capacitance">{"c2"}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {
-                        if let Some(results) = &*results {
-                            if results.is_empty() {
-                                html!{
-                                    <tr>
-                                        <td class="msg" colspan="7">{"no results found"}</td>
-                                    </tr>
-                                }
-                            } else {
-                                results.iter().map(|result| {
-                                    html!{<tr>
-                                        <td class="frequency">{format_units(result.frequency())}</td>
-                                        <td class="q-factor">{format_units(result.q_factor())}</td>
-                                        <td class="inductance">{format_units(result.inductance())}</td>
-                                        <td class="r1-resistance">{format_units(result.r1_resistance())}</td>
-                                        <td class="r2-resistance">{format_units(result.r2_resistance())}</td>
-                                        <td class="c1-capacitance">{format_units(result.c1_capacitance())}</td>
-                                        <td class="c2-capacitance">{format_units(result.c2_capacitance())}</td>
-                                    </tr>}
-                                }).collect::<Html>()
-                            }
-                        } else {
-                            html!{
-                                <tr>
-                                    <td class="msg" colspan="7">{"click \"calculate\" above to begin"}</td>
-                                </tr>
-                            }
-                        }
-                    }
-                </tbody>
-            </table>
+            <Results results={results} />
         </form>
     }
 }

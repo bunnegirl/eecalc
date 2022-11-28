@@ -1,54 +1,75 @@
-pub mod tables;
+pub mod series;
 pub mod units;
 
+use series::*;
 use std::f64::consts::PI;
-use tables::*;
+pub use Arg::*;
+pub use Input::*;
 
-#[derive(Debug, PartialEq, PartialOrd)]
-pub struct ToleranceValue(pub f64, pub f64);
+pub const SERIES_OPTIONS: [Series; 4] = [Series::E6, Series::E12, Series::E24, Series::E48];
 
-impl ToleranceValue {
-    pub fn target(&self) -> f64 {
-        self.0
-    }
-
-    pub fn tolerance(&self) -> f64 {
-        self.1
-    }
-
-    pub fn minimum(&self) -> f64 {
-        let target = self.target();
-        let tolerance = self.tolerance();
-
-        target - (target * tolerance)
-    }
-
-    pub fn maximum(&self) -> f64 {
-        let target = self.target();
-        let tolerance = self.tolerance();
-
-        target + (target * tolerance)
-    }
-}
+pub const TOLERANCE_OPTIONS: [f64; 8] = [0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3];
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub enum ComponentValue {
-    Given(f64),
-    Series(Series, f64, f64),
+pub enum Arg {
+    ArgWithExact(f64),
+    ArgWithTolerance(f64, f64),
+    ArgWithSeries(Series, f64, f64),
 }
 
-impl ComponentValue {
+impl Arg {
     pub fn to_table(&self) -> Vec<f64> {
-        use ComponentValue::*;
-
         match self {
-            Given(value) => vec![*value],
-            Series(series, min, max) => series_table(series.clone(), *min, *max),
+            ArgWithExact(value) => vec![*value],
+            ArgWithTolerance(value, _) => vec![*value],
+            ArgWithSeries(series, min, max) => series_table(series.clone(), *min, *max),
         }
     }
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, PartialEq)]
+pub enum Input {
+    InputWithExact(Option<f64>, Option<f64>),
+    InputWithTolerance(Option<f64>, f64, f64),
+    InputWithSeries(Series, Option<f64>, Option<f64>, f64, f64),
+}
+
+impl Input {
+    pub fn to_arg(&self) -> Option<Arg> {
+        match self {
+            InputWithSeries(series, min, max, min_fallback, max_fallback) => {
+                let (min, max) = if let (Some(min), Some(max)) = (min, max) {
+                    (min, max)
+                } else if let (None, Some(max)) = (min, max) {
+                    (min_fallback, max)
+                } else if let (Some(min), None) = (min, max) {
+                    (min, max_fallback)
+                } else {
+                    (min_fallback, max_fallback)
+                };
+
+                Some(ArgWithSeries(series.clone(), *min, *max))
+            }
+            InputWithTolerance(target, tolerance, fallback) => {
+                let target = if let Some(target) = target {
+                    target
+                } else {
+                    fallback
+                };
+
+                Some(ArgWithTolerance(*target, *tolerance))
+            }
+            InputWithExact(target, fallback) => match (target, fallback) {
+                (Some(target), _) => Some(ArgWithExact(*target)),
+                (None, Some(fallback)) => Some(ArgWithExact(*fallback)),
+                (None, None) => None,
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Selection(f64, f64, f64, f64, f64, f64, f64);
 
 impl Selection {
@@ -81,20 +102,28 @@ impl Selection {
     }
 }
 
-pub fn calculate(
-    frequency: ToleranceValue,
-    q_factor: ToleranceValue,
-    r1: ComponentValue,
-    r2: ComponentValue,
-    c1: ComponentValue,
-    c2: ComponentValue,
-) -> Vec<Selection> {
-    let frequency_target = frequency.target();
-    let frequency_minimum = frequency.minimum();
-    let frequency_maximum = frequency.maximum();
+fn value_to_tolerance(value: Arg) -> (f64, f64, f64) {
+    match value {
+        ArgWithExact(target) => (target, target, target),
+        ArgWithTolerance(target, tolerance) => (
+            target,
+            target - (target * tolerance),
+            target + (target * tolerance),
+        ),
+        ArgWithSeries(_, min, max) => (min, min, max),
+    }
+}
 
-    let q_factor_minimum = q_factor.minimum();
-    let q_factor_maximum = q_factor.maximum();
+pub fn calculate(
+    frequency: Arg,
+    q_factor: Arg,
+    r1: Arg,
+    r2: Arg,
+    c1: Arg,
+    c2: Arg,
+) -> Vec<Selection> {
+    let (frequency_target, frequency_minimum, frequency_maximum) = value_to_tolerance(frequency);
+    let (_q_factor_target, q_factor_minimum, q_factor_maximum) = value_to_tolerance(q_factor);
 
     let r1_table = r1.to_table();
     let r2_table = r2.to_table();
